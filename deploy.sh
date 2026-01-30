@@ -43,11 +43,6 @@ echo "Building add-on..."
 
 echo "Deploying to $TARGET_PATH..."
 
-# Backup existing config if it exists
-if [ -f "$TARGET_PATH/config.yaml" ]; then
-    echo "Backing up existing config.yaml..."
-    cp "$TARGET_PATH/config.yaml" "$TARGET_PATH/config.yaml.backup"
-fi
 
 # Use rsync to exclude unwanted files
 # --inplace: avoid temp files (needed for SMB/mounted volumes)
@@ -62,14 +57,6 @@ rsync -rv --delete --inplace --no-times --no-perms --no-owner --no-group \
   --exclude='*.log' \
   build/home-analytics/ "$TARGET_PATH/"
 
-# Restore user configuration from backup if it exists
-if [ -f "$TARGET_PATH/config.yaml.backup" ]; then
-    echo "Preserving user configuration..."
-    # For this simple add-on, we don't have complex user configs to preserve
-    # Just restore the backup as-is for now
-    mv "$TARGET_PATH/config.yaml.backup" "$TARGET_PATH/config.yaml"
-    echo "  - Restored configuration"
-fi
 
 echo "Deployment complete!"
 

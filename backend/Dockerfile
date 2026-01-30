@@ -36,9 +36,7 @@ WORKDIR /app
 COPY backend/app.py backend/api.py backend/log_config.py backend/requirements.txt ./
 COPY backend/sensors.yaml ./
 
-# Copy services and config directories
 COPY backend/services/ ./services/
-COPY backend/config/ ./config/
 
 # Copy run script
 COPY backend/run.sh ./

@@ -1,6 +1,6 @@
 name: "HomeAnalytics Add-on"
 description: "A Home Assistant Add-on for home energy consumption and cost analytics"
-version: "0.1.13"
+version: "0.1.15"
 slug: "home-analytics"
 init: false
 arch:
