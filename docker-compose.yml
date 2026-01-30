@@ -1,0 +1,26 @@
+services:
+  home-analytics-dev:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.dev
+    container_name: home-analytics-dev
+    volumes:
+      - ./backend:/app
+      - ./config.yaml:/app/config.yaml:ro
+    environment:
+      - TZ=Europe/Stockholm
+      - HA_URL=${HA_URL}
+      - HA_TOKEN=${HA_TOKEN}
+      - PYTHONPATH=/app
+      - WATCHFILES_FORCE_POLLING=true
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    command: uvicorn app:app --host 0.0.0.0 --port 8080 --reload
+    restart: unless-stopped
+    networks:
+      - home-analytics-network
+
+networks:
+  home-analytics-network:

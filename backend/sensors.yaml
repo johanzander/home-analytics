@@ -1,0 +1,35 @@
+# List of sensors to be monitored by HomeAnalytics
+
+sensors:
+  # Electricity price (needed for cost calculations)
+  - sensor.electricity_price_gustavsgatan_32a           # Nordpool price via Tibber
+
+  # Critical sensors for basic analysis
+  - sensor.outdoor                                      # Outdoor temperature (H1)
+  - sensor.last_meter_consumption_gustavsgatan_32a      # Total grid import (all hypotheses)
+  - sensor.compr_consump_tot                            # Compressor total consumption (H4 COP)
+  - sensor.supp_energy_tot                              # Total energy delivered by heat pump (H4 COP)
+
+  # Important sensors for isolating factors (H3)
+  - sensor.zap263668_energy_meter                       # EV charger
+  - sensor.energy_meter_total_consumption_gardshus      # Guest house
+  - sensor.energy_meter_total_consumption_lenes_har     # Salon
+  - sensor.aux_consumption_tot                          # Auxiliary heater total
+
+  # Heating system sensors - IVT AirX via Husdata H60 (H2, H4)
+  - sensor.heat_carrier_forwrd                          # Forward line temperature
+  - sensor.heat_carrier_return                          # Return line temperature (proxy for radiator temp)
+  - binary_sensor.switch_valve_1                        # True=hot water, False=heating
+  - sensor.compressor_speed                             # Compressor speed (% of max)
+  - sensor.compressor_speed_2                           # Compressor power (kW)
+
+  # Desirable sensors for deeper analysis
+  - sensor.supp_energy_heating                          # Supplied energy, heating
+  - sensor.supp_energy_hotwater                         # Supplied energy, hot water
+  - sensor.compr_cons_heating                           # Compressor consumption, heating
+  - sensor.compr_cons_hotwat                            # Compressor consumption, hot water
+
+  # Hot water sensors - temperature and setpoint (H6)
+  - sensor.warm_water_setpoint                          # Hot water setpoint
+  - sensor.warm_water_1_top                             # Temp top of tank
+  - sensor.warm_water_2_mid                             # Temp middle of tank

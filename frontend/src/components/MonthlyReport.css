@@ -1,0 +1,550 @@
+/* ===== REPORT LAYOUT ===== */
+.monthly-report {
+  height: 100%;
+}
+
+.report-layout {
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+}
+
+.report-sidebar {
+  flex-shrink: 0;
+  position: sticky;
+  top: 32px;
+}
+
+.report-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  transition: opacity 0.2s ease;
+}
+
+/* ===== LOADING STATE ===== */
+.loading-state {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 16px 20px;
+  background: var(--surface-elevated);
+  border-radius: 10px;
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+/* Loading overlay - greys out content while keeping it visible */
+.report-main.loading-overlay {
+  position: relative;
+  pointer-events: none;
+}
+
+.report-main.loading-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(1px);
+  border-radius: 12px;
+  z-index: 10;
+}
+
+.report-main.loading-overlay > * {
+  opacity: 0.5;
+  filter: grayscale(30%);
+  transition: opacity 0.2s ease, filter 0.2s ease;
+}
+
+/* ===== ERROR CARD ===== */
+.error-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 10px;
+  color: var(--error);
+  font-size: 0.925rem;
+}
+
+/* ===== EMPTY STATE ===== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 80px 40px;
+  background: var(--surface-elevated);
+  border-radius: 12px;
+  border: 1px solid var(--border-light);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.empty-state svg {
+  opacity: 0.4;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 0.925rem;
+}
+
+/* ===== INVOICE CARD ===== */
+.invoice-card {
+  background: var(--surface-elevated);
+  border-radius: 12px;
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.invoice-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-light);
+  background: linear-gradient(to right, var(--surface-elevated), var(--bg-primary));
+}
+
+.invoice-header h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.invoice-period {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--accent-primary);
+  background: rgba(13, 148, 136, 0.1);
+  padding: 6px 14px;
+  border-radius: 100px;
+}
+
+.invoice-body {
+  padding: 0;
+}
+
+.invoice-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-light);
+  background: var(--bg-primary);
+}
+
+.avg-price-label {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.avg-price-value {
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* ===== INVOICE TABLE ===== */
+.invoice-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.invoice-table th,
+.invoice-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 0.9rem;
+}
+
+.invoice-table th {
+  background: var(--table-header);
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.invoice-table td:first-child {
+  color: var(--text-secondary);
+}
+
+/* Row labels with units */
+.row-label {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.row-unit {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.row-detail {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* Column styling */
+.invoice-table .col-total,
+.invoice-table .col-gardshus,
+.invoice-table .col-salong {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  min-width: 110px;
+}
+
+.invoice-table th.col-total {
+  background: var(--total-header);
+}
+
+.invoice-table td.col-total {
+  background: var(--total-bg);
+  font-weight: 500;
+}
+
+.invoice-table th.col-gardshus {
+  background: var(--gardshus-header);
+}
+
+.invoice-table td.col-gardshus {
+  background: var(--gardshus-bg);
+}
+
+.invoice-table th.col-salong {
+  background: var(--salong-header);
+}
+
+.invoice-table td.col-salong {
+  background: var(--salong-bg);
+}
+
+.invoice-table .muted {
+  color: var(--text-muted);
+}
+
+/* Consumption row */
+.consumption-row td:first-child {
+  font-weight: 500;
+}
+
+.consumption-row td {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Section dividers */
+.section-divider td {
+  padding: 10px 16px;
+  background: var(--bg-primary);
+  border-bottom: none;
+}
+
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.provider-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  border-radius: 6px;
+  letter-spacing: 0.02em;
+}
+
+.provider-badge.tibber {
+  background: linear-gradient(135deg, #23d1a8 0%, #0d9488 100%);
+  color: white;
+}
+
+.provider-badge.eon {
+  background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);
+  color: white;
+}
+
+.provider-type {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* Subtotal rows */
+.subtotal-row td {
+  background: rgba(0, 0, 0, 0.02);
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.subtotal-row td.col-total {
+  background: color-mix(in srgb, var(--total-bg) 80%, rgba(0,0,0,0.05));
+}
+
+.subtotal-row td.col-gardshus {
+  background: color-mix(in srgb, var(--gardshus-bg) 80%, rgba(0,0,0,0.05));
+}
+
+.subtotal-row td.col-salong {
+  background: color-mix(in srgb, var(--salong-bg) 80%, rgba(0,0,0,0.05));
+}
+
+/* Section totals */
+.section-total td {
+  background: rgba(0, 0, 0, 0.04);
+  border-bottom: 2px solid var(--border-medium);
+}
+
+.section-total td.col-total {
+  background: color-mix(in srgb, var(--total-bg) 70%, rgba(0,0,0,0.08));
+}
+
+.section-total td.col-gardshus {
+  background: color-mix(in srgb, var(--gardshus-bg) 70%, rgba(0,0,0,0.08));
+}
+
+.section-total td.col-salong {
+  background: color-mix(in srgb, var(--salong-bg) 70%, rgba(0,0,0,0.08));
+}
+
+/* Grand total */
+.invoice-table tfoot .grand-total td {
+  padding: 16px;
+  background: var(--sidebar-bg);
+  color: white;
+  border-bottom: none;
+  font-size: 1rem;
+}
+
+.invoice-table tfoot .grand-total td.col-total,
+.invoice-table tfoot .grand-total td.col-gardshus,
+.invoice-table tfoot .grand-total td.col-salong {
+  background: var(--sidebar-bg);
+  color: white;
+}
+
+/* Contribution styling */
+.contribution {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.contribution-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ===== HOURLY CARD ===== */
+.hourly-card {
+  background: var(--surface-elevated);
+  border-radius: 12px;
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.hourly-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.hourly-header h4 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.record-count {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  background: var(--bg-primary);
+  padding: 4px 10px;
+  border-radius: 100px;
+}
+
+.hourly-table-wrapper {
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+/* ===== HOURLY TABLE ===== */
+.hourly-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.hourly-table th,
+.hourly-table td {
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 0.85rem;
+}
+
+.hourly-table th {
+  background: var(--table-header);
+  font-weight: 600;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.hourly-table .col-time {
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.hourly-table .col-gardshus,
+.hourly-table .col-salong,
+.hourly-table .col-price,
+.hourly-table .col-cost {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.hourly-table th.col-gardshus {
+  background: var(--gardshus-header);
+}
+
+.hourly-table td.col-gardshus {
+  background: var(--gardshus-bg);
+}
+
+.hourly-table th.col-salong {
+  background: var(--salong-header);
+}
+
+.hourly-table td.col-salong {
+  background: var(--salong-bg);
+}
+
+.hourly-table th.col-price {
+  background: #fce4ec;
+}
+
+.hourly-table td.col-price {
+  background: #fdf2f8;
+}
+
+.hourly-table th.col-cost {
+  background: var(--total-header);
+}
+
+.hourly-table td.col-cost {
+  background: var(--total-bg);
+}
+
+.hourly-table tbody tr:hover td {
+  filter: brightness(0.97);
+}
+
+/* Hourly summary row */
+.hourly-table tfoot .summary-row {
+  position: sticky;
+  bottom: 0;
+}
+
+.hourly-table tfoot .summary-row td {
+  padding: 14px;
+  background: var(--sidebar-bg);
+  color: white;
+  border-top: 2px solid var(--sidebar-bg);
+  border-bottom: none;
+}
+
+.hourly-table tfoot .summary-row td.col-gardshus,
+.hourly-table tfoot .summary-row td.col-salong,
+.hourly-table tfoot .summary-row td.col-price,
+.hourly-table tfoot .summary-row td.col-cost {
+  background: var(--sidebar-bg);
+  color: white;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 900px) {
+  .report-layout {
+    flex-direction: column;
+  }
+
+  .report-sidebar {
+    position: static;
+    width: 100%;
+  }
+
+  .report-sidebar .month-picker {
+    width: 100%;
+  }
+
+  .invoice-table th,
+  .invoice-table td {
+    padding: 10px 12px;
+    font-size: 0.85rem;
+  }
+
+  .invoice-table .col-total,
+  .invoice-table .col-gardshus,
+  .invoice-table .col-salong {
+    min-width: 90px;
+  }
+}
+
+@media (max-width: 640px) {
+  .invoice-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .invoice-table th,
+  .invoice-table td {
+    padding: 8px 10px;
+    font-size: 0.8rem;
+  }
+
+  .invoice-table .col-total,
+  .invoice-table .col-gardshus,
+  .invoice-table .col-salong {
+    min-width: 70px;
+  }
+
+  .hourly-table-wrapper {
+    max-height: 300px;
+  }
+}

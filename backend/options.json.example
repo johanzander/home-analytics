@@ -1,0 +1,25 @@
+{
+  "influxdb_url": "http://your-influxdb-server:8086/api/v2/query",
+  "influxdb_username": "your_username",
+  "influxdb_password": "your_password",
+  "influxdb_bucket": "home_assistant/autogen",
+
+  "sensor_electricity_price": "sensor.your_electricity_price_sensor",
+  "sensor_tibber_total": "sensor.your_tibber_total_sensor",
+  "sensor_gardshus": "sensor.your_area1_consumption_sensor",
+  "sensor_salong": "sensor.your_area2_consumption_sensor",
+
+  "tibber_subscription_ex_moms": 39.20,
+  "tibber_markup_per_kwh_ex_moms": 0.068,
+
+  "eon_transfer_fee_per_kwh": 0.2456,
+  "eon_energy_tax_per_kwh": 0.439,
+  "eon_subscription_ex_moms": 805.00,
+
+  "gardshus_name": "Area 1",
+  "gardshus_eon_contribution": 165.00,
+  "salong_name": "Area 2",
+  "salong_eon_contribution": 0,
+
+  "vat_rate": 0.25
+}
