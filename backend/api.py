@@ -15,6 +15,15 @@ from loguru import logger
 from services.influx_service import InfluxService
 
 
+# ---------------------------------------------------------------------------
+# In-memory cache for _compute_month_data results
+# Key: (year, month) → {"data": <result dict>, "cached_at": <datetime>}
+# Past months are cached indefinitely; current month uses a short TTL.
+# ---------------------------------------------------------------------------
+_month_cache: dict[tuple[int, int], dict[str, Any]] = {}
+_CURRENT_MONTH_TTL_SECONDS = 300  # 5 minutes for the current (incomplete) month
+
+
 # Load options from config.yaml (dev/prod)
 def load_options_config() -> dict:
     import json
@@ -236,6 +245,163 @@ def calculate_totals(gardshus: dict, salong: dict, cost_config: dict) -> dict:
     }
 
 
+MONTHS_SV = [
+    "Januari", "Februari", "Mars", "April", "Maj", "Juni",
+    "Juli", "Augusti", "September", "Oktober", "November", "December",
+]
+
+
+def _compute_month_data(
+    year: int, month: int, influx: InfluxService
+) -> dict[str, Any] | None:
+    """Core monthly computation shared between report and invoice views.
+
+    Queries sensor data, handles gaps via linear interpolation, computes
+    per-area consumption and costs.  Returns all computed data or None
+    if no sensor data is available for the period.
+
+    Results are cached in memory.  Past months are cached indefinitely;
+    the current month is cached for 5 minutes.
+    """
+    now = datetime.now()
+    key = (year, month)
+    is_current_month = year == now.year and month == now.month
+
+    # Check cache
+    if key in _month_cache:
+        entry = _month_cache[key]
+        if is_current_month:
+            age = (now - entry["cached_at"]).total_seconds()
+            if age < _CURRENT_MONTH_TTL_SECONDS:
+                logger.debug(f"Cache hit (current month, age={age:.0f}s): {year}-{month:02d}")
+                return entry["data"]
+        else:
+            logger.debug(f"Cache hit (past month): {year}-{month:02d}")
+            return entry["data"]
+
+    last_day = monthrange(year, month)[1]
+    start_date = datetime(year, month, 1, 0, 0, 0)
+    end_date = datetime(year, month, last_day, 23, 0, 0)
+
+    sensors = load_sensors_config()
+    sensor_list = list(sensors.values())
+    df = influx.query_specific_sensors(
+        start_date=start_date, end_date=end_date, sensor_list=sensor_list
+    )
+
+    if df.empty:
+        if not is_current_month:
+            _month_cache[key] = {"data": None, "cached_at": datetime.now()}
+        return None
+
+    # Check that at least the meter sensors are present
+    has_gardshus = sensors["gardshus"] in df.columns
+    has_salong = sensors["salong"] in df.columns
+    if not has_gardshus and not has_salong:
+        if not is_current_month:
+            _month_cache[key] = {"data": None, "cached_at": datetime.now()}
+        return None
+
+    # Handle zeros as missing data (sensor outages) for meter readings
+    for sensor_name in [sensors["gardshus"], sensors["salong"]]:
+        if sensor_name not in df.columns:
+            continue
+        mask = df[sensor_name] == 0
+        if mask.any():
+            logger.debug(
+                f"Replacing {mask.sum()} zero values with NaN for {sensor_name}"
+            )
+            df.loc[mask, sensor_name] = pd.NA
+
+    # Track which hours have missing meter data (before interpolation)
+    gardshus_estimated = (
+        df[sensors["gardshus"]].isna() if has_gardshus else pd.Series(dtype=bool)
+    )
+    salong_estimated = (
+        df[sensors["salong"]].isna() if has_salong else pd.Series(dtype=bool)
+    )
+
+    # Linear interpolation spreads gap consumption evenly across missing hours
+    for sensor_name in [sensors["gardshus"], sensors["salong"]]:
+        if sensor_name in df.columns:
+            df[sensor_name] = (
+                df[sensor_name].interpolate(method="linear").ffill().bfill()
+            )
+
+    # Extract meter readings
+    gardshus_last = float(df[sensors["gardshus"]].iloc[-1]) if has_gardshus else None
+    salong_last = float(df[sensors["salong"]].iloc[-1]) if has_salong else None
+
+    # Calculate hourly consumption (delta from cumulative meter readings)
+    if has_gardshus:
+        df["gardshus_consumption"] = df[sensors["gardshus"]].diff()
+    if has_salong:
+        df["salong_consumption"] = df[sensors["salong"]].diff()
+
+    # Get electricity price (already in SEK/kWh inkl moms)
+    df["price"] = df[sensors["electricity_price"]] if sensors["electricity_price"] in df.columns else 0
+
+    # Load cost configuration
+    cost_config = load_cost_config()
+    moms_rate = cost_config.get("common", {}).get("moms_rate", 0.25)
+    tibber_markup_per_kwh_ex_moms = cost_config.get("energy_supplier", {}).get(
+        "markup_per_kwh_ex_moms", 0.068
+    )
+
+    # Calculate spot and markup for each area
+    for area in ["gardshus", "salong"]:
+        if f"{area}_consumption" not in df.columns:
+            continue
+        df[f"{area}_spot"] = df[f"{area}_consumption"] * (
+            df["price"] - tibber_markup_per_kwh_ex_moms * (1 + moms_rate)
+        )
+        df[f"{area}_markup"] = (
+            df[f"{area}_consumption"] * tibber_markup_per_kwh_ex_moms * (1 + moms_rate)
+        )
+        df[f"{area}_cost"] = df[f"{area}_spot"] + df[f"{area}_markup"]
+
+    # Calculate area totals
+    gardshus_kwh = float(df["gardshus_consumption"].sum()) if has_gardshus else 0
+    salong_kwh = float(df["salong_consumption"].sum()) if has_salong else 0
+    gardshus_el_cost = float(df["gardshus_cost"].sum()) if has_gardshus else 0
+    salong_el_cost = float(df["salong_cost"].sum()) if has_salong else 0
+
+    # Calculate per-area invoices (includes E.ON grid fees)
+    gardshus_invoice = calculate_area_invoice(
+        consumption_kwh=gardshus_kwh,
+        hourly_tibber_cost=gardshus_el_cost,
+        area_key="gardshus",
+        cost_config=cost_config,
+    ) if has_gardshus else None
+
+    salong_invoice = calculate_area_invoice(
+        consumption_kwh=salong_kwh,
+        hourly_tibber_cost=salong_el_cost,
+        area_key="salong",
+        cost_config=cost_config,
+    ) if has_salong else None
+
+    result = {
+        "start_date": start_date,
+        "end_date": end_date,
+        "df": df,
+        "sensors": sensors,
+        "cost_config": cost_config,
+        "gardshus_invoice": gardshus_invoice,
+        "salong_invoice": salong_invoice,
+        "gardshus_meter_reading": round(gardshus_last, 1) if gardshus_last is not None else None,
+        "salong_meter_reading": round(salong_last, 1) if salong_last is not None else None,
+        "gardshus_estimated": gardshus_estimated,
+        "salong_estimated": salong_estimated,
+    }
+
+    # Store in cache
+    _month_cache[key] = {"data": result, "cached_at": datetime.now()}
+    logger.debug(f"Cached month data: {year}-{month:02d}")
+
+    return result
+
+
 router = APIRouter()
 
 
@@ -269,6 +435,15 @@ async def startup_event() -> None:
 async def hello_api() -> dict:
     """Return a hello message."""
     return {"message": "Hello from API!", "version": "0.1.0"}
+
+
+@router.post("/cache/clear")
+async def clear_cache() -> dict:
+    """Clear the in-memory month data cache."""
+    count = len(_month_cache)
+    _month_cache.clear()
+    logger.info(f"Cleared {count} cached month entries")
+    return {"cleared": count}
 
 
 @router.get("/energy/history")
@@ -318,26 +493,24 @@ async def get_monthly_report(
 
     Returns consumption in kWh and cost in SEK for the specified month.
     """
-    # Calculate start and end dates for the month
-    last_day = monthrange(year, month)[1]
-    start_date = datetime(year, month, 1, 0, 0, 0)
-    end_date = datetime(year, month, last_day, 23, 0, 0)
-
     logger.info(f"Generating monthly report for {year}-{month:02d}")
 
-    # Load sensor mappings from config
-    sensors = load_sensors_config()
-
-    # Fetch ONLY the needed sensors (much faster than querying all)
-    sensor_list = list(sensors.values())
-    df = get_influx_service().query_specific_sensors(
-        start_date=start_date, end_date=end_date, sensor_list=sensor_list
-    )
-
-    if df.empty:
+    # Use shared monthly computation
+    computed = _compute_month_data(year, month, get_influx_service())
+    if computed is None:
         raise HTTPException(status_code=404, detail="No data available for this period")
 
-    # Check that required sensors are present
+    df = computed["df"]
+    sensors = computed["sensors"]
+    cost_config = computed["cost_config"]
+    gardshus_invoice = computed["gardshus_invoice"]
+    salong_invoice = computed["salong_invoice"]
+    gardshus_estimated = computed["gardshus_estimated"]
+    salong_estimated = computed["salong_estimated"]
+    start_date = computed["start_date"]
+    end_date = computed["end_date"]
+
+    # Check that all required sensors are present for the full report
     missing = [name for name, sensor in sensors.items() if sensor not in df.columns]
     if missing:
         raise HTTPException(
@@ -345,74 +518,19 @@ async def get_monthly_report(
             detail=f"Missing sensors in data: {missing}. Available: {list(df.columns)}",
         )
 
-    # Handle zeros as missing data (sensor outages) for meter readings
-    # Reference: fluxQueryServer.py lines 315-325
-    for sensor_name in [sensors["gardshus"], sensors["salong"]]:
-        mask = df[sensor_name] == 0
-        if mask.any():
-            logger.debug(
-                f"Replacing {mask.sum()} zero values with NaN for {sensor_name}"
-            )
-            df.loc[mask, sensor_name] = pd.NA
+    if gardshus_invoice is None or salong_invoice is None:
+        raise HTTPException(status_code=404, detail="Missing area data for report")
 
-    # Forward fill then backward fill to handle missing values
-    df[sensors["gardshus"]] = df[sensors["gardshus"]].ffill().bfill()
-    df[sensors["salong"]] = df[sensors["salong"]].ffill().bfill()
-
-    # Debug: Log first and last values for cumulative sensors
-    gardshus_first = df[sensors["gardshus"]].iloc[0]
-    gardshus_last = df[sensors["gardshus"]].iloc[-1]
-    salong_first = df[sensors["salong"]].iloc[0]
-    salong_last = df[sensors["salong"]].iloc[-1]
-    logger.info(
-        f"Gårdshus meter: first={gardshus_first:.2f}, last={gardshus_last:.2f}, delta={gardshus_last - gardshus_first:.2f}"
-    )
-    logger.info(
-        f"Salong meter: first={salong_first:.2f}, last={salong_last:.2f}, delta={salong_last - salong_first:.2f}"
-    )
-
-    # Calculate hourly consumption (delta from cumulative meter readings)
-    df["gardshus_consumption"] = df[sensors["gardshus"]].diff()
-    df["salong_consumption"] = df[sensors["salong"]].diff()
-
-    # Get electricity price (already in SEK/kWh)
-    df["price"] = df[sensors["electricity_price"]]
-
-    # Load cost configuration before using it
-    cost_config = load_cost_config()
-
-    # Tibber markup per kWh (ex. moms) from config
+    moms_rate = cost_config.get("common", {}).get("moms_rate", 0.25)
     tibber_markup_per_kwh_ex_moms = cost_config.get("energy_supplier", {}).get(
         "markup_per_kwh_ex_moms", 0.068
     )
 
-    # Calculate spot and markup for each area
-    moms_rate = cost_config.get("common", {}).get("moms_rate", 0.25)
-    df["gardshus_spot"] = df["gardshus_consumption"] * (
-        df["price"] - tibber_markup_per_kwh_ex_moms * (1 + moms_rate)
-    )
-    df["gardshus_markup"] = (
-        df["gardshus_consumption"] * tibber_markup_per_kwh_ex_moms * (1 + moms_rate)
-    )
-    df["salong_spot"] = df["salong_consumption"] * (
-        df["price"] - tibber_markup_per_kwh_ex_moms * (1 + moms_rate)
-    )
-    df["salong_markup"] = (
-        df["salong_consumption"] * tibber_markup_per_kwh_ex_moms * (1 + moms_rate)
-    )
-
-    df["gardshus_cost"] = df["gardshus_spot"] + df["gardshus_markup"]
-    df["salong_cost"] = df["salong_spot"] + df["salong_markup"]
-
-    # Calculate totals
-    gardshus_kwh = df["gardshus_consumption"].sum()
-    salong_kwh = df["salong_consumption"].sum()
-    gardshus_el_cost = df["gardshus_cost"].sum()
-    salong_el_cost = df["salong_cost"].sum()
-    gardshus_spot = df["gardshus_spot"].sum()
-    gardshus_markup = df["gardshus_markup"].sum()
-    salong_spot = df["salong_spot"].sum()
-    salong_markup = df["salong_markup"].sum()
+    # Area totals from shared computation
+    gardshus_spot = float(df["gardshus_spot"].sum())
+    gardshus_markup = float(df["gardshus_markup"].sum())
+    salong_spot = float(df["salong_spot"].sum())
+    salong_markup = float(df["salong_markup"].sum())
 
     # Calculate Tibber total for the property (from Tibber sensor)
     energy_first = df[sensors["energy_consumption"]].iloc[0]
@@ -442,22 +560,7 @@ async def get_monthly_report(
     total_kwh = energy_diffs[valid].sum()
     avg_spot_ex_moms = weighted_spot_sum / total_kwh if total_kwh > 0 else None
 
-    # Calculate invoices (cost_config already loaded above)
-
-    # Calculate per-area invoices
-    gardshus_invoice = calculate_area_invoice(
-        consumption_kwh=gardshus_kwh,
-        hourly_tibber_cost=gardshus_el_cost,
-        area_key="gardshus",
-        cost_config=cost_config,
-    )
-
-    salong_invoice = calculate_area_invoice(
-        consumption_kwh=salong_kwh,
-        hourly_tibber_cost=salong_el_cost,
-        area_key="salong",
-        cost_config=cost_config,
-    )
+    # Area invoices already computed by _compute_month_data (same calculate_area_invoice)
 
     # Calculate totals (includes full subscription fees)
     # Use Tibber sensor for total consumption
@@ -553,6 +656,10 @@ async def get_monthly_report(
                     if not pd.isna(row["salong_cost"])
                     else None
                 ),
+                "estimated": bool(
+                    gardshus_estimated.get(timestamp, False)
+                    or salong_estimated.get(timestamp, False)
+                ),
             }
         )
 
@@ -597,4 +704,98 @@ async def get_monthly_report(
         "tibber_markup_per_kwh_ex_moms": tibber_markup_per_kwh_ex_moms,
         "average_spot_ore_per_kwh": avg_spot_ore_per_kwh,
         "eon_rates": eon_rates,
+    }
+
+
+@router.get("/report/invoice")
+async def get_invoice_report(
+    start_year: int = Query(..., ge=2020, le=2100),
+    start_month: int = Query(..., ge=1, le=12),
+    end_year: int = Query(..., ge=2020, le=2100),
+    end_month: int = Query(..., ge=1, le=12),
+) -> dict:
+    """
+    Get invoice data for salong over a range of months.
+
+    Returns per-month rows with meter reading, consumption, cost per kWh,
+    and total cost, plus a grand total.
+    """
+    influx = get_influx_service()
+
+    # Validate range
+    start_val = start_year * 12 + start_month
+    end_val = end_year * 12 + end_month
+    if start_val > end_val:
+        raise HTTPException(
+            status_code=400, detail="Start month must be before or equal to end month"
+        )
+    if end_val - start_val > 24:
+        raise HTTPException(
+            status_code=400, detail="Range must not exceed 24 months"
+        )
+
+    logger.info(
+        f"Generating invoice report for {start_year}-{start_month:02d} to {end_year}-{end_month:02d}"
+    )
+
+    # Get previous month's reading as baseline for first month's consumption
+    prev_y = start_year if start_month > 1 else start_year - 1
+    prev_m = start_month - 1 if start_month > 1 else 12
+    baseline = _compute_month_data(prev_y, prev_m, influx)
+    prev_reading = baseline["salong_meter_reading"] if baseline else None
+
+    # Iterate through each month in range
+    invoice_months: list[dict] = []
+    y, m = start_year, start_month
+    while y * 12 + m <= end_val:
+        computed = _compute_month_data(y, m, influx)
+        last_day = monthrange(y, m)[1]
+
+        reading = computed["salong_meter_reading"] if computed else None
+        salong_inv = computed["salong_invoice"] if computed else None
+
+        if reading is not None and prev_reading is not None and salong_inv is not None:
+            consumption = round(reading - prev_reading, 1)
+            # Use the same total_inkl_moms as the monthly report
+            total_cost = salong_inv["total_inkl_moms"]
+            cost_per_kwh = round(total_cost / consumption, 2) if consumption > 0 else 0
+        else:
+            consumption = None
+            total_cost = None
+            cost_per_kwh = None
+
+        invoice_months.append({
+            "year": y,
+            "month": m,
+            "period_label": f"{MONTHS_SV[m - 1]} {y}",
+            "period_start": f"{y}-{m:02d}-01",
+            "period_end": f"{y}-{m:02d}-{last_day}",
+            "meter_reading_kwh": reading,
+            "consumption_kwh": consumption,
+            "cost_per_kwh": cost_per_kwh,
+            "total_cost_sek": total_cost,
+        })
+
+        prev_reading = reading
+        # Advance to next month
+        if m == 12:
+            y += 1
+            m = 1
+        else:
+            m += 1
+
+    # Calculate grand totals
+    total_consumption = sum(
+        row["consumption_kwh"] for row in invoice_months if row["consumption_kwh"] is not None
+    )
+    total_cost = sum(
+        row["total_cost_sek"] for row in invoice_months if row["total_cost_sek"] is not None
+    )
+
+    return {
+        "invoice_months": invoice_months,
+        "grand_total": {
+            "total_consumption_kwh": round(total_consumption, 1),
+            "total_cost_sek": round(total_cost, 2),
+        },
     }

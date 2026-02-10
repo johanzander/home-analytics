@@ -1,0 +1,40 @@
+/* ===== MONTH RANGE PICKER ===== */
+.month-range-picker {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.range-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.range-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-left: 4px;
+}
+
+.range-separator {
+  color: var(--text-muted);
+  font-size: 1.125rem;
+  padding-bottom: 10px;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 640px) {
+  .month-range-picker {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .range-separator {
+    display: none;
+  }
+}

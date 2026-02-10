@@ -1,0 +1,116 @@
+/* ===== INVOICE VIEW ===== */
+.invoice-view .page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  gap: 24px;
+}
+
+/* ===== FAKTURA HEADER ===== */
+.faktura-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.faktura-header-left h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.faktura-tenant {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+/* ===== FAKTURA TABLE ===== */
+.faktura-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.faktura-table th,
+.faktura-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 0.9rem;
+}
+
+.faktura-table th {
+  background: var(--table-header);
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.faktura-table .col-numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  min-width: 120px;
+}
+
+.faktura-table .col-period {
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.faktura-table .col-amount {
+  font-weight: 500;
+}
+
+.faktura-table tbody tr:hover td {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+/* Grand total */
+.faktura-table tfoot .grand-total td {
+  padding: 16px;
+  background: var(--sidebar-bg);
+  color: white;
+  border-bottom: none;
+  font-size: 1rem;
+}
+
+.faktura-table tfoot .grand-total td.col-numeric {
+  text-align: right;
+  color: white;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .invoice-view .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .faktura-table th,
+  .faktura-table td {
+    padding: 10px 12px;
+    font-size: 0.85rem;
+  }
+
+  .faktura-table .col-numeric {
+    min-width: 90px;
+  }
+}
+
+@media (max-width: 640px) {
+  .faktura-table th,
+  .faktura-table td {
+    padding: 8px 10px;
+    font-size: 0.8rem;
+  }
+
+  .faktura-table .col-numeric {
+    min-width: 70px;
+  }
+}

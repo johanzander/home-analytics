@@ -320,8 +320,8 @@ function MonthlyReport() {
                     </thead>
                     <tbody>
                       {report.hourly_data.map((row, index) => (
-                        <tr key={index}>
-                          <td className="col-time">{formatTime(row.time)}</td>
+                        <tr key={index} className={row.estimated ? 'estimated-row' : ''}>
+                          <td className="col-time">{formatTime(row.time)}{row.estimated && <span className="estimated-badge">est</span>}</td>
                           <td className="col-gardshus">{row.gardshus_kwh !== undefined && row.gardshus_kwh !== null ? `${formatNumber(row.gardshus_kwh, 2)} ` : ''}<span className="cell-unit">kWh</span></td>
                           <td className="col-salong">{row.salong_kwh !== undefined && row.salong_kwh !== null ? `${formatNumber(row.salong_kwh, 2)} ` : ''}<span className="cell-unit">kWh</span></td>
                           <td className="col-price">{row.price_sek !== undefined && row.price_sek !== null ? `${formatNumber(row.price_sek, 2)} ` : ''}<span className="cell-unit">SEK/kWh</span></td>

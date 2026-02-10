@@ -517,6 +517,31 @@
   color: white;
 }
 
+/* ===== ESTIMATED ROWS ===== */
+.hourly-table .estimated-row td {
+  color: var(--error, #ef4444);
+}
+
+.hourly-table .estimated-row td.col-gardshus,
+.hourly-table .estimated-row td.col-salong,
+.hourly-table .estimated-row td.col-cost {
+  color: var(--error, #ef4444);
+}
+
+.estimated-badge {
+  display: inline-block;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--error, #ef4444);
+  background: rgba(239, 68, 68, 0.1);
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
   .page-header {

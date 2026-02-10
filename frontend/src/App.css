@@ -26,6 +26,37 @@
   gap: 32px;
 }
 
+/* ===== NAV LINKS ===== */
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nav-link {
+  padding: 6px 16px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.nav-link:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.nav-link.active {
+  color: white;
+  background: rgba(255, 255, 255, 0.12);
+  font-weight: 600;
+}
+
 .logo {
   display: flex;
   align-items: center;
@@ -71,6 +102,15 @@
   .top-nav {
     padding: 0 16px;
     height: 56px;
+  }
+
+  .nav-left {
+    gap: 16px;
+  }
+
+  .nav-link {
+    padding: 4px 10px;
+    font-size: 0.8rem;
   }
 
   .logo-title {

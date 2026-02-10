@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import MonthlyReport from './components/MonthlyReport';
+import Invoice from './components/Invoice';
 import './App.css';
 
 // Icon components
@@ -10,6 +11,8 @@ const BoltIcon = () => (
 );
 
 function App() {
+  const [view, setView] = useState('report');
+
   return (
     <div className="app-layout">
       {/* Top Navigation */}
@@ -23,12 +26,27 @@ function App() {
               <span className="logo-title">HomeAnalytics</span>
             </div>
           </div>
+          <nav className="nav-links">
+            <button
+              className={`nav-link ${view === 'report' ? 'active' : ''}`}
+              onClick={() => setView('report')}
+            >
+              Månadsrapport
+            </button>
+            <button
+              className={`nav-link ${view === 'invoice' ? 'active' : ''}`}
+              onClick={() => setView('invoice')}
+            >
+              Faktura
+            </button>
+          </nav>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="main-content">
-        <MonthlyReport />
+        {view === 'report' && <MonthlyReport />}
+        {view === 'invoice' && <Invoice />}
       </main>
     </div>
   );
