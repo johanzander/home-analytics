@@ -51,9 +51,8 @@ WORKDIR /app
 COPY backend/app.py backend/api.py backend/log_config.py backend/requirements.txt ./
 COPY backend/sensors.yaml ./
 
-# Copy services and config directories
+# Copy services directory
 COPY backend/services/ ./services/
-COPY backend/config/ ./config/
 
 # Copy run script
 COPY backend/run.sh ./
@@ -61,7 +60,7 @@ COPY backend/run.sh ./
 # Create and use virtual environment
 RUN python3 -m venv /app/venv
 ENV PATH="/app/venv/bin:$PATH"
-ENV PYTHONPATH="/app:${PYTHONPATH}"
+ENV PYTHONPATH="/app"
 
 # Install Python requirements in the virtual environment
 RUN pip install --no-cache-dir --upgrade pip && \
