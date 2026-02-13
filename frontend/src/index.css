@@ -56,6 +56,18 @@
   --salong-border: #93c5fd;
   --salong-header: #dbeafe;
 
+  --billaddning-bg: #faf5ff;
+  --billaddning-border: #c084fc;
+  --billaddning-header: #ede9fe;
+
+  --varmepump-bg: #fef2f2;
+  --varmepump-border: #fca5a5;
+  --varmepump-header: #fee2e2;
+
+  --ovrigt-bg: #f8fafc;
+  --ovrigt-border: #cbd5e0;
+  --ovrigt-header: #e2e8f0;
+
   --total-bg: #fff7ed;
   --total-border: #fdba74;
   --total-header: #fed7aa;

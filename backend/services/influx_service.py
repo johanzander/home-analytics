@@ -358,8 +358,9 @@ from(bucket: "{self.bucket}")
         full_index = pd.date_range(start=start_local, end=end_local, freq="h")
         result = result.reindex(full_index)
 
-        # Forward fill missing values
-        result = result.ffill()
+        # No ffill here — _compute_month_data tracks estimated (NaN = no data)
+        # before applying ffill itself.  This lets us distinguish "no data
+        # captured" from "cumulative reading unchanged".
 
         logger.info(
             f"Query returned {len(result)} hourly data points for {len(result.columns)} sensors"

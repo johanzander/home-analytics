@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import MonthRangePicker from './MonthRangePicker';
+import InvoicePdfForm from './InvoicePdfForm';
 import './Invoice.css';
 
 const MONTHS = [
@@ -7,25 +8,29 @@ const MONTHS = [
   'Juli', 'Augusti', 'September', 'Oktober', 'November', 'December'
 ];
 
+const INVOICE_AREAS = [
+  { key: 'salong', label: 'Salong' },
+  { key: 'gardshus', label: 'Gårdshus' },
+];
+
 function Invoice() {
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
 
-  // Default range: 6 months back to previous month
-  const defaultEndMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-  const defaultEndYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-  const sixMonthsBack = new Date(defaultEndYear, defaultEndMonth - 6, 1);
-  const defaultStartMonth = sixMonthsBack.getMonth() + 1;
-  const defaultStartYear = sixMonthsBack.getFullYear();
+  // Default: previous completed month
+  const defaultMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+  const defaultYear = currentMonth === 1 ? currentYear - 1 : currentYear;
 
-  const [startYear, setStartYear] = useState(defaultStartYear);
-  const [startMonth, setStartMonth] = useState(defaultStartMonth);
-  const [endYear, setEndYear] = useState(defaultEndYear);
-  const [endMonth, setEndMonth] = useState(defaultEndMonth);
+  const [startYear, setStartYear] = useState(defaultYear);
+  const [startMonth, setStartMonth] = useState(defaultMonth);
+  const [endYear, setEndYear] = useState(defaultYear);
+  const [endMonth, setEndMonth] = useState(defaultMonth);
+  const [area, setArea] = useState('salong');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showPdfForm, setShowPdfForm] = useState(false);
 
   useEffect(() => {
     // Validate range before fetching
@@ -38,6 +43,7 @@ function Invoice() {
     }
 
     const controller = new AbortController();
+    let mounted = true;
     setLoading(true);
     setError(null);
 
@@ -46,28 +52,38 @@ function Invoice() {
       start_month: startMonth,
       end_year: endYear,
       end_month: endMonth,
+      area: area,
     });
     fetch(`./api/report/invoice?${params}`, { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Failed to fetch invoice data');
+          let errorMessage = 'Failed to fetch invoice data';
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.detail || errorMessage;
+          } catch { /* server didn't return JSON */ }
+          throw new Error(errorMessage);
         }
         return response.json();
       })
       .then((result) => {
+        if (!mounted) return;
         setData(result);
         setLoading(false);
       })
       .catch((err) => {
         if (err.name === 'AbortError') return;
+        if (!mounted) return;
         setError(err.message);
         setData(null);
         setLoading(false);
       });
 
-    return () => controller.abort();
-  }, [startYear, startMonth, endYear, endMonth]);
+    return () => {
+      mounted = false;
+      controller.abort();
+    };
+  }, [startYear, startMonth, endYear, endMonth, area]);
 
   const formatCurrency = (value) => {
     if (value === null || value === undefined) return '-';
@@ -92,15 +108,29 @@ function Invoice() {
     return start === end ? start : `${start} – ${end}`;
   };
 
+  const hasEon = data?.has_eon_abonnemang;
+
   return (
     <div className="invoice-view">
       {/* Page Header */}
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-title">Faktura</h1>
-          <p className="page-subtitle">Elkostnad för salong Lene's Hår</p>
+          <p className="page-subtitle">Elkostnad för {data?.area_name || INVOICE_AREAS.find(a => a.key === area)?.label || area}</p>
         </div>
         <div className="page-header-right">
+          <div className="range-field">
+            <label className="range-label">Område</label>
+            <select
+              value={area}
+              onChange={(e) => setArea(e.target.value)}
+              className="area-select"
+            >
+              {INVOICE_AREAS.map(a => (
+                <option key={a.key} value={a.key}>{a.label}</option>
+              ))}
+            </select>
+          </div>
           <MonthRangePicker
             startYear={startYear}
             startMonth={startMonth}
@@ -137,9 +167,23 @@ function Invoice() {
             <div className="invoice-header">
               <div className="faktura-header-left">
                 <h3>Faktura — Elkostnad</h3>
-                <span className="faktura-tenant">Lene's Hår AB · Gustavsgatan 32</span>
+                <span className="faktura-tenant">{data.area_name}</span>
               </div>
-              <span className="invoice-period">{periodLabel()}</span>
+              <div className="invoice-header-right">
+                <button
+                  className="btn-pdf-toggle"
+                  onClick={() => setShowPdfForm(prev => !prev)}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="16" y1="13" x2="8" y2="13"/>
+                    <line x1="16" y1="17" x2="8" y2="17"/>
+                  </svg>
+                  {showPdfForm ? 'Dölj PDF' : 'Skapa PDF'}
+                </button>
+                <span className="invoice-period">{periodLabel()}</span>
+              </div>
             </div>
 
             <div className="invoice-body">
@@ -150,6 +194,9 @@ function Invoice() {
                     <th className="col-numeric">Avläst (kWh)</th>
                     <th className="col-numeric">Elförbrukning (kWh)</th>
                     <th className="col-numeric">Elkostnad (kr/kWh)</th>
+                    {hasEon && (
+                      <th className="col-numeric col-eon-abon">Elnätsabon. (SEK)</th>
+                    )}
                     <th className="col-numeric">Belopp (SEK)</th>
                   </tr>
                 </thead>
@@ -160,6 +207,9 @@ function Invoice() {
                       <td className="col-numeric">{formatNumber(row.meter_reading_kwh)}</td>
                       <td className="col-numeric">{formatNumber(row.consumption_kwh)}</td>
                       <td className="col-numeric">{formatNumber(row.cost_per_kwh, 2)}</td>
+                      {hasEon && (
+                        <td className="col-numeric col-eon-abon">{formatCurrency(row.eon_abonnemang_sek)}</td>
+                      )}
                       <td className="col-numeric col-amount">{formatCurrency(row.total_cost_sek)}</td>
                     </tr>
                   ))}
@@ -170,11 +220,18 @@ function Invoice() {
                     <td className="col-numeric"></td>
                     <td className="col-numeric"><strong>{formatNumber(data.grand_total.total_consumption_kwh)}</strong> <span className="cell-unit">kWh</span></td>
                     <td className="col-numeric"></td>
+                    {hasEon && (
+                      <td className="col-numeric col-eon-abon"><strong>{formatCurrency(data.grand_total.total_eon_abonnemang_sek)}</strong></td>
+                    )}
                     <td className="col-numeric col-amount"><strong>{formatCurrency(data.grand_total.total_cost_sek)}</strong></td>
                   </tr>
                 </tfoot>
               </table>
             </div>
+
+            {showPdfForm && (
+              <InvoicePdfForm invoiceData={data} />
+            )}
           </div>
         )}
 

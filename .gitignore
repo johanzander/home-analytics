@@ -50,6 +50,9 @@ frontend/dist/
 # Backend static (if used)
 backend/static/
 
+# Invoice settings (local persistence)
+data/
+
 # Miscellaneous
 *.log
 

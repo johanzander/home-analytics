@@ -32,6 +32,9 @@ options:
     energy_consumption: "sensor.last_meter_consumption_gustavsgatan_32a"
     gardshus: "sensor.energy_meter_total_consumption_gardshus"
     salong: "sensor.energy_meter_total_consumption_lenes_har"
+    billaddning: "sensor.zap263668_energy_meter"
+    varmepump_kompressor: "sensor.compr_consump_tot"
+    varmepump_tilsats: "sensor.aux_consumption_tot"
   cost:
     areas:
       gardshus:
@@ -39,6 +42,12 @@ options:
         eon_abonnemang_bidrag_inkl_moms: 165.00
       salong:
         name: "Salong"
+        eon_abonnemang_bidrag_inkl_moms: 0
+      billaddning:
+        name: "Billaddning"
+        eon_abonnemang_bidrag_inkl_moms: 0
+      varmepump:
+        name: "Värmepump"
         eon_abonnemang_bidrag_inkl_moms: 0
     energy_supplier:
       abonnemang_ex_moms: 39.20
@@ -61,12 +70,21 @@ schema:
     energy_consumption: str
     gardshus: str
     salong: str
+    billaddning: str
+    varmepump_kompressor: str
+    varmepump_tilsats: str
   cost:
     areas:
       gardshus:
         name: str
         eon_abonnemang_bidrag_inkl_moms: float
       salong:
+        name: str
+        eon_abonnemang_bidrag_inkl_moms: float
+      billaddning:
+        name: str
+        eon_abonnemang_bidrag_inkl_moms: float
+      varmepump:
         name: str
         eon_abonnemang_bidrag_inkl_moms: float
     energy_supplier:

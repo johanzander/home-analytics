@@ -1,0 +1,157 @@
+/* ===== PDF FORM CARD ===== */
+.pdf-form-card {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+  margin-top: 16px;
+}
+
+.pdf-form-title {
+  margin: 0 0 20px 0;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* ===== FORM GRID ===== */
+.pdf-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 24px;
+}
+
+.pdf-fieldset {
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 0;
+}
+
+.pdf-fieldset legend {
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 8px;
+}
+
+.pdf-fieldset label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 10px;
+}
+
+.pdf-fieldset label:last-child {
+  margin-bottom: 0;
+}
+
+.pdf-fieldset label span {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.pdf-fieldset input {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  background: var(--surface-primary);
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.pdf-fieldset input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.1);
+}
+
+.pdf-fieldset input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+.pdf-fieldset input[type="number"]::-webkit-inner-spin-button,
+.pdf-fieldset input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* ===== FORM ACTIONS ===== */
+.pdf-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-light);
+}
+
+.pdf-form-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pdf-form-actions .btn-primary {
+  background: var(--accent-primary);
+  color: white;
+}
+
+.pdf-form-actions .btn-primary:hover {
+  background: var(--accent-secondary);
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.25);
+}
+
+.pdf-form-actions .btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pdf-form-actions .btn-secondary {
+  background: var(--surface-primary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-light);
+}
+
+.pdf-form-actions .btn-secondary:hover {
+  background: var(--table-header);
+  border-color: var(--text-muted);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 900px) {
+  .pdf-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .pdf-form-card {
+    padding: 16px;
+  }
+
+  .pdf-form-actions {
+    flex-direction: column;
+  }
+
+  .pdf-form-actions .btn {
+    justify-content: center;
+  }
+}

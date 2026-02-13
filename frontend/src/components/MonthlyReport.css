@@ -110,6 +110,25 @@
   font-size: 0.925rem;
 }
 
+/* ===== CURRENT MONTH BANNER ===== */
+.current-month-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: 10px;
+  color: #b45309;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.current-month-banner svg {
+  flex-shrink: 0;
+  color: #d97706;
+}
+
 /* ===== INVOICE CARD ===== */
 .invoice-card {
   background: var(--surface-elevated);
@@ -148,6 +167,7 @@
 
 .invoice-body {
   padding: 0;
+  overflow-x: auto;
 }
 
 .invoice-footer {
@@ -228,10 +248,13 @@
 /* Column styling */
 .invoice-table .col-total,
 .invoice-table .col-gardshus,
-.invoice-table .col-salong {
+.invoice-table .col-salong,
+.invoice-table .col-billaddning,
+.invoice-table .col-varmepump,
+.invoice-table .col-ovrigt {
   text-align: right;
   font-variant-numeric: tabular-nums;
-  min-width: 110px;
+  min-width: 95px;
 }
 
 .invoice-table th.col-total {
@@ -257,6 +280,30 @@
 
 .invoice-table td.col-salong {
   background: var(--salong-bg);
+}
+
+.invoice-table th.col-billaddning {
+  background: var(--billaddning-header);
+}
+
+.invoice-table td.col-billaddning {
+  background: var(--billaddning-bg);
+}
+
+.invoice-table th.col-varmepump {
+  background: var(--varmepump-header);
+}
+
+.invoice-table td.col-varmepump {
+  background: var(--varmepump-bg);
+}
+
+.invoice-table th.col-ovrigt {
+  background: var(--ovrigt-header);
+}
+
+.invoice-table td.col-ovrigt {
+  background: var(--ovrigt-bg);
 }
 
 .invoice-table .muted {
@@ -333,6 +380,18 @@
   background: color-mix(in srgb, var(--salong-bg) 80%, rgba(0,0,0,0.05));
 }
 
+.subtotal-row td.col-billaddning {
+  background: color-mix(in srgb, var(--billaddning-bg) 80%, rgba(0,0,0,0.05));
+}
+
+.subtotal-row td.col-varmepump {
+  background: color-mix(in srgb, var(--varmepump-bg) 80%, rgba(0,0,0,0.05));
+}
+
+.subtotal-row td.col-ovrigt {
+  background: color-mix(in srgb, var(--ovrigt-bg) 80%, rgba(0,0,0,0.05));
+}
+
 /* Section totals */
 .section-total td {
   background: rgba(0, 0, 0, 0.04);
@@ -351,6 +410,18 @@
   background: color-mix(in srgb, var(--salong-bg) 70%, rgba(0,0,0,0.08));
 }
 
+.section-total td.col-billaddning {
+  background: color-mix(in srgb, var(--billaddning-bg) 70%, rgba(0,0,0,0.08));
+}
+
+.section-total td.col-varmepump {
+  background: color-mix(in srgb, var(--varmepump-bg) 70%, rgba(0,0,0,0.08));
+}
+
+.section-total td.col-ovrigt {
+  background: color-mix(in srgb, var(--ovrigt-bg) 70%, rgba(0,0,0,0.08));
+}
+
 /* Grand total */
 .invoice-table tfoot .grand-total td {
   padding: 16px;
@@ -362,7 +433,10 @@
 
 .invoice-table tfoot .grand-total td.col-total,
 .invoice-table tfoot .grand-total td.col-gardshus,
-.invoice-table tfoot .grand-total td.col-salong {
+.invoice-table tfoot .grand-total td.col-salong,
+.invoice-table tfoot .grand-total td.col-billaddning,
+.invoice-table tfoot .grand-total td.col-varmepump,
+.invoice-table tfoot .grand-total td.col-ovrigt {
   background: var(--sidebar-bg);
   color: white;
 }
@@ -417,6 +491,7 @@
 .hourly-table-wrapper {
   max-height: 480px;
   overflow-y: auto;
+  overflow-x: auto;
 }
 
 /* ===== HOURLY TABLE ===== */
@@ -453,6 +528,9 @@
 
 .hourly-table .col-gardshus,
 .hourly-table .col-salong,
+.hourly-table .col-billaddning,
+.hourly-table .col-varmepump,
+.hourly-table .col-ovrigt,
 .hourly-table .col-price,
 .hourly-table .col-cost {
   text-align: right;
@@ -473,6 +551,30 @@
 
 .hourly-table td.col-salong {
   background: var(--salong-bg);
+}
+
+.hourly-table th.col-billaddning {
+  background: var(--billaddning-header);
+}
+
+.hourly-table td.col-billaddning {
+  background: var(--billaddning-bg);
+}
+
+.hourly-table th.col-varmepump {
+  background: var(--varmepump-header);
+}
+
+.hourly-table td.col-varmepump {
+  background: var(--varmepump-bg);
+}
+
+.hourly-table th.col-ovrigt {
+  background: var(--ovrigt-header);
+}
+
+.hourly-table td.col-ovrigt {
+  background: var(--ovrigt-bg);
 }
 
 .hourly-table th.col-price {
@@ -511,21 +613,19 @@
 
 .hourly-table tfoot .summary-row td.col-gardshus,
 .hourly-table tfoot .summary-row td.col-salong,
+.hourly-table tfoot .summary-row td.col-billaddning,
+.hourly-table tfoot .summary-row td.col-varmepump,
+.hourly-table tfoot .summary-row td.col-ovrigt,
 .hourly-table tfoot .summary-row td.col-price,
 .hourly-table tfoot .summary-row td.col-cost {
   background: var(--sidebar-bg);
   color: white;
 }
 
-/* ===== ESTIMATED ROWS ===== */
-.hourly-table .estimated-row td {
-  color: var(--error, #ef4444);
-}
-
-.hourly-table .estimated-row td.col-gardshus,
-.hourly-table .estimated-row td.col-salong,
-.hourly-table .estimated-row td.col-cost {
-  color: var(--error, #ef4444);
+/* ===== ESTIMATED CELLS (per-area) ===== */
+.hourly-table td.estimated-cell {
+  color: var(--text-muted, #94a3b8);
+  font-style: italic;
 }
 
 .estimated-badge {
@@ -540,6 +640,20 @@
   vertical-align: middle;
   text-transform: uppercase;
   letter-spacing: 0.03em;
+}
+
+/* ===== DATA QUALITY BADGE ===== */
+.quality-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #d97706;
+  background: rgba(217, 119, 6, 0.12);
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-left: 4px;
+  vertical-align: middle;
+  cursor: help;
 }
 
 /* ===== RESPONSIVE ===== */
@@ -563,8 +677,11 @@
 
   .invoice-table .col-total,
   .invoice-table .col-gardshus,
-  .invoice-table .col-salong {
-    min-width: 90px;
+  .invoice-table .col-salong,
+  .invoice-table .col-billaddning,
+  .invoice-table .col-varmepump,
+  .invoice-table .col-ovrigt {
+    min-width: 80px;
   }
 }
 
@@ -587,8 +704,11 @@
 
   .invoice-table .col-total,
   .invoice-table .col-gardshus,
-  .invoice-table .col-salong {
-    min-width: 70px;
+  .invoice-table .col-salong,
+  .invoice-table .col-billaddning,
+  .invoice-table .col-varmepump,
+  .invoice-table .col-ovrigt {
+    min-width: 65px;
   }
 
   .hourly-table-wrapper {
