@@ -791,7 +791,7 @@ async def startup_event() -> None:
 @router.get("/hello")
 async def hello_api() -> dict:
     """Return a hello message."""
-    return {"message": "Hello from API!", "version": "0.1.0"}
+    return {"message": "Hello from API!", "version": "0.2.0"}
 
 
 @router.post("/cache/clear")
