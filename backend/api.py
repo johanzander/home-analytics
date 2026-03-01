@@ -526,13 +526,24 @@ def _compute_month_data(
                 break
 
     # Step 3: Auto-detect outliers (garbage values, spikes).
-    # Only run on sensors flagged with needs_cleaning (e.g. varmepump).
-    # Clean sensors like gardshus, salong, billaddning don't need this.
-    cleanable_sensor_ids = []
-    for area_key, area_def in AREA_DEFINITIONS.items():
-        if area_has_data[area_key] and area_def.get("needs_cleaning"):
-            for sk in area_def["sensor_keys"]:
-                cleanable_sensor_ids.append(sensors[sk])
+    #
+    # All area sensors need rate-of-change spike detection.  Sensors marked
+    # needs_cleaning additionally have bimodal/unimodal absolute-value issues.
+    # The total energy sensor is included too — uncaught spikes in it inflate
+    # övrigt (it is never used for per-area cost attribution, so cleaning it
+    # only improves the övrigt residual calculation).
+    #
+    # NOTE: The bimodal/unimodal passes in _remove_outliers are harmless for
+    # normal cumulative meters (e.g. gardshus, salong) because their values
+    # cluster tightly around the median — the checks simply won't fire.
+    # The rate-of-change pass will catch reporting-delay dumps (e.g. a sensor
+    # that was silent for several days and then reports the entire backlog in
+    # one hour), which distort per-hour cost attribution even though the
+    # monthly meter total is correct.
+    cleanable_sensor_ids = list(all_area_sensor_ids)
+    _energy_sid = sensors.get("energy_consumption", "")
+    if _energy_sid and _energy_sid in df.columns:
+        cleanable_sensor_ids.append(_energy_sid)
 
     # Track NaN counts before/after to compute data quality per area.
     pre_outlier_nans = {
@@ -563,14 +574,23 @@ def _compute_month_data(
     # Step 4: Interpolate / forward-fill / backward-fill remaining gaps
     # (from outlier removal).  No rounding — fractional values from
     # interpolation serve as a visible signal that data was cleaned.
-    for sensor_id in all_area_sensor_ids:
+    # Also apply to the energy sensor so NaN'd spikes are filled in before
+    # the övrigt calculation.
+    _sensors_to_interpolate = list(all_area_sensor_ids)
+    if _energy_sid and _energy_sid in df.columns:
+        _sensors_to_interpolate.append(_energy_sid)
+    for sensor_id in _sensors_to_interpolate:
         if sensor_id in df.columns:
             df[sensor_id] = (
                 df[sensor_id].interpolate(method="linear").ffill().bfill()
             )
 
-    # Step 5: Enforce monotonicity — cumulative meters should never decrease
-    df = _enforce_monotonicity(df, all_area_sensor_ids)
+    # Step 5: Enforce monotonicity — cumulative meters should never decrease.
+    # Include the energy sensor so any residual negativity is fixed before diff.
+    _sensors_for_monotonicity = list(all_area_sensor_ids)
+    if _energy_sid and _energy_sid in df.columns:
+        _sensors_for_monotonicity.append(_energy_sid)
+    df = _enforce_monotonicity(df, _sensors_for_monotonicity)
 
     # Save sensor baselines (value at hour before month start) for normalization.
     # After computing hourly diffs, the sum can diverge from the meter reading
