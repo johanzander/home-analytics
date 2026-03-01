@@ -365,6 +365,91 @@ def _remove_outliers(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
     return df
 
 
+def _spread_reporting_delays(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+    """Redistribute reporting-delay dumps in cumulative meter sensors.
+
+    A sensor that goes silent for several hours/days and then reports all
+    accumulated consumption in one step produces a large positive diff at the
+    dump hour.  Because cost = consumption × hourly_price, dumping everything
+    into one cheap or expensive hour distorts the cost calculation even though
+    the total monthly consumption (meter delta) is correct.
+
+    Detection: a diff that exceeds the rate-of-change threshold AND is
+    immediately preceded by a run of zero diffs (hours where the sensor was
+    silent and ffill held the reading constant).
+
+    Fix: redistribute the dump amount evenly across the entire zero-diff run
+    (the silent period) so each hour gets an equal share.  This is called
+    after ffill so the zero-diff pattern reliably marks sensor silence.
+
+    Genuine single-point spikes that are NOT preceded by a zero-diff gap are
+    left unchanged for _remove_outliers to handle.
+    """
+    for col in columns:
+        if col not in df.columns:
+            continue
+
+        arr = df[col].to_numpy(dtype=float, copy=True)
+        n = len(arr)
+
+        # Compute threshold from the sensor's typical positive step.
+        pos_steps = [arr[i] - arr[i - 1] for i in range(1, n)
+                     if not (pd.isna(arr[i]) or pd.isna(arr[i - 1]))
+                     and arr[i] > arr[i - 1]]
+        if not pos_steps:
+            continue
+        median_step = float(pd.Series(pos_steps).median())
+        if median_step <= 0:
+            continue
+        threshold = max(median_step * 20, 50.0)
+
+        changed = False
+        i = 1
+        while i < n:
+            if pd.isna(arr[i]) or pd.isna(arr[i - 1]):
+                i += 1
+                continue
+            diff_i = arr[i] - arr[i - 1]
+            if diff_i <= threshold:
+                i += 1
+                continue
+
+            # Found a dump at position i.
+            # Walk backward from i-1 through consecutive zero diffs to find
+            # the start of the silent (ffill'd-constant) period.
+            j = i - 1
+            while j > 0 and not pd.isna(arr[j]) and not pd.isna(arr[j - 1]):
+                if abs(arr[j] - arr[j - 1]) > 1e-9:
+                    break
+                j -= 1
+            gap_start = j + 1  # first hour of the zero-diff (silent) run
+
+            if gap_start >= i or gap_start == 0:
+                # No zero-diff gap before this spike, or gap extends all the
+                # way to the start of data (no anchor point) — leave for
+                # _remove_outliers to handle as a genuine spike.
+                i += 1
+                continue
+
+            # Redistribute dump_amount evenly across [gap_start … i].
+            gap_length = i - gap_start + 1
+            start_val = arr[gap_start - 1]
+            for j in range(gap_length):
+                arr[gap_start + j] = start_val + diff_i * (j + 1) / gap_length
+
+            logger.info(
+                f"Spread {col}: {diff_i:.1f} kWh reporting-delay dump "
+                f"redistributed over {gap_length} h"
+            )
+            changed = True
+            i = gap_start + gap_length  # skip past the redistributed region
+
+        if changed:
+            df[col] = arr
+
+    return df
+
+
 def _enforce_monotonicity(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
     """Ensure cumulative meter columns are monotonically non-decreasing.
 
@@ -469,7 +554,8 @@ def _compute_month_data(
     # Pipeline order:
     #   1. Track estimated (hours beyond sensor's last real data point)
     #   2. Forward-fill (correct for cumulative meters between data points)
-    #   3. Outlier removal (detect garbage values)
+    #   2b. Spread reporting-delay dumps across the preceding silent period
+    #   3. Outlier removal (detect garbage values, genuine spikes)
     #   4. Interpolate remaining gaps (from outlier removal)
     #   5. Enforce monotonicity
 
@@ -584,6 +670,30 @@ def _compute_month_data(
             df[sensor_id] = (
                 df[sensor_id].interpolate(method="linear").ffill().bfill()
             )
+
+    # Step 4b: Spread reporting-delay dumps.
+    # Run AFTER outlier removal + interpolation so that meter counter resets
+    # (sensor briefly drops to 0, then jumps back to real cumulative) are
+    # cleaned first — the unimodal outlier check NaN's the 0.0 values, then
+    # interpolation restores them to ~real level, leaving no spike for the
+    # spread function to misidentify.
+    # Run BEFORE monotonicity so the redistributed values already form a
+    # smooth, non-decreasing sequence.
+    #
+    # Only run on clean single-value cumulative sensors.  Bimodal sensors
+    # (needs_cleaning, e.g. varmepump aux) have large legitimate value
+    # transitions between clusters that look like dumps but are not.
+    _spread_sensors = [
+        sensors[area_def["sensor_keys"][0]]
+        for area_key, area_def in AREA_DEFINITIONS.items()
+        if area_has_data[area_key]
+        and not area_def.get("needs_cleaning")
+        and len(area_def["sensor_keys"]) == 1
+        and sensors[area_def["sensor_keys"][0]] in df.columns
+    ]
+    if _energy_sid and _energy_sid in df.columns:
+        _spread_sensors.append(_energy_sid)
+    df = _spread_reporting_delays(df, _spread_sensors)
 
     # Step 5: Enforce monotonicity — cumulative meters should never decrease.
     # Include the energy sensor so any residual negativity is fixed before diff.
