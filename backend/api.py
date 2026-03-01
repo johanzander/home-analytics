@@ -411,7 +411,11 @@ def _compute_month_data(
                 return entry["data"]
         else:
             logger.debug(f"Cache hit (past month): {year}-{month:02d}")
-            return entry["data"]
+            data = entry["data"]
+            # Ensure is_current_month reflects today, not when it was cached.
+            if data and data.get("is_current_month"):
+                data = {**data, "is_current_month": False}
+            return data
 
     last_day = monthrange(year, month)[1]
     start_date = datetime(year, month, 1, 0, 0, 0)
@@ -869,13 +873,12 @@ async def get_monthly_report(
     end_date = computed["end_date"]
     is_current_month = computed["is_current_month"]
 
-    # Check that price and total consumption sensors are present
-    required_sensors = ["electricity_price", "energy_consumption"]
-    missing = [name for name in required_sensors if sensors[name] not in df.columns]
-    if missing:
+    # electricity_price is required; energy_consumption (Tibber meter) is optional —
+    # it may be absent on the first day of a new month or if the sensor is unavailable.
+    if sensors.get("electricity_price", "") not in df.columns:
         raise HTTPException(
             status_code=404,
-            detail=f"Missing sensors in data: {missing}. Available: {list(df.columns)}",
+            detail=f"Missing price sensor in data. Available: {list(df.columns)}",
         )
 
     if not area_invoices:
@@ -897,11 +900,27 @@ async def get_monthly_report(
                 "markup_ex_moms": round(area_markup / (1 + moms_rate), 2),
             }
 
-    # Calculate Tibber total for the property (from Tibber sensor)
-    energy_first = df[sensors["energy_consumption"]].iloc[0]
-    energy_last = df[sensors["energy_consumption"]].iloc[-1]
-    energy_total_kwh = energy_last - energy_first
-    energy_diffs = df[sensors["energy_consumption"]].diff().clip(lower=0)
+    # Calculate Tibber total for the property.
+    # Prefer the dedicated total-consumption sensor; fall back to area sum when absent.
+    energy_sensor_id = sensors.get("energy_consumption", "")
+    has_energy_sensor = bool(energy_sensor_id) and energy_sensor_id in df.columns
+    if has_energy_sensor:
+        energy_first = df[energy_sensor_id].iloc[0]
+        energy_last = df[energy_sensor_id].iloc[-1]
+        energy_total_kwh = energy_last - energy_first
+        energy_diffs = df[energy_sensor_id].diff().clip(lower=0)
+    else:
+        logger.warning(
+            f"energy_consumption sensor '{energy_sensor_id}' absent from data; "
+            "falling back to area consumption sum for Tibber totals"
+        )
+        area_cons_cols = [
+            f"{ak}_consumption"
+            for ak in AREA_DEFINITIONS
+            if f"{ak}_consumption" in df.columns
+        ]
+        energy_diffs = sum(df[c] for c in area_cons_cols) if area_cons_cols else pd.Series(0.0, index=df.index)
+        energy_total_kwh = float(energy_diffs.sum())
     energy_total_spot = (
         (df["price"] - tibber_markup_per_kwh_ex_moms * (1 + moms_rate))
         * energy_diffs
@@ -912,7 +931,7 @@ async def get_monthly_report(
         * (1 + moms_rate)
     ).sum()
 
-    # Calculate average spot price (ex moms) based on Tibber sensor
+    # Calculate average spot price (ex moms) based on energy diffs
     valid = energy_diffs > 0
     spot_per_hour = (df["price"] - tibber_markup_per_kwh_ex_moms * (1 + moms_rate)) / (
         1 + moms_rate
