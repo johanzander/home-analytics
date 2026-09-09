@@ -9,25 +9,23 @@ ARG BUILD_REF
 # Labels
 LABEL \
     io.hass.name="HomeAnalytics Add-on" \
-    io.hass.description="A generic Home Assistant Add-on template with Python backend and React frontend" \
+    io.hass.description="A Home Assistant Add-on for home energy consumption and cost analytics" \
     io.hass.version=${BUILD_VERSION} \
     io.hass.type="addon" \
-    io.hass.arch="aarch64,amd64,armhf,armv7,i386" \
-    maintainer="Your Name <your.email@example.com>" \
+    io.hass.arch="aarch64,amd64" \
+    maintainer="Johan Zander <johanzander@gmail.com>" \
     org.label-schema.build-date=${BUILD_DATE} \
-    org.label-schema.description="A generic Home Assistant Add-on template with Python backend and React frontend" \
+    org.label-schema.description="A Home Assistant Add-on for home energy consumption and cost analytics" \
     org.label-schema.name="HomeAnalytics Add-on" \
     org.label-schema.schema-version="1.0" \
     org.label-schema.vcs-ref=${BUILD_REF}
 
-# Install requirements for add-on (no Node.js - frontend is pre-built)
-RUN apk add --no-cache \
-    python3 \
-    py3-pip \
-    python3-dev \
-    gcc \
-    musl-dev \
-    bash
+# Install requirements for add-on (no Node.js - frontend is pre-built).
+# Python and pip come from the base image (/usr/local/bin). Do NOT apk add
+# python3/py3-pip here: on the HA base-python images that installs Alpine's
+# own interpreter at /usr/bin alongside it, and which one `python3 -m venv`
+# picks then depends on PATH order. gcc/musl-dev stay for source builds.
+RUN apk add --no-cache gcc musl-dev bash
 
 # Set working directory
 WORKDIR /app

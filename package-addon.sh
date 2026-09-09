@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-# Package HomeAnalytics add-on for local Home Assistant installation
-# For GitHub/HACS installation, Home Assistant builds directly from the repo
+# Package HomeAnalytics add-on for local Home Assistant installation.
+# Home Assistant builds the container from the bundled Dockerfile at install time.
 
 echo "🔨 Building HomeAnalytics add-on package..."
 
@@ -52,13 +52,11 @@ echo "📦 Creating repository structure..."
 mkdir -p ./build/repository/home-analytics
 cp -r "$BUILD_DIR"/* ./build/repository/home-analytics/
 
-# Create repository.json
-cat > ./build/repository.json <<EOF
-{
-  "name": "HomeAnalytics Add-on Repository",
-  "url": "https://github.com/johanzander/home-analytics",
-  "maintainer": "Johan Zander <johanzander@gmail.com>"
-}
+# Create repository.yaml
+cat > ./build/repository.yaml <<EOF
+name: HomeAnalytics Add-on Repository
+url: https://github.com/johanzander/home-analytics
+maintainer: Johan Zander <johanzander@gmail.com>
 EOF
 
 echo "✅ Package created in ./build/"

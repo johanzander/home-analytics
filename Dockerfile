@@ -1,4 +1,18 @@
-ARG BUILD_FROM
+ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base-python:3.13-alpine3.22
+
+# Build the frontend natively to avoid QEMU npm timeouts: $BUILDPLATFORM is
+# the host doing the build (amd64 on CI runners, arm64 on an Apple Silicon
+# dev machine), never the emulated target. The stage emits plain JS, so its
+# arch does not matter to the image.
+FROM --platform=$BUILDPLATFORM node:20-alpine AS frontend-builder
+ARG BUILD_VERSION
+WORKDIR /tmp/frontend
+RUN echo "Building frontend for version ${BUILD_VERSION}"
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
 FROM $BUILD_FROM
 
 # Set version labels
@@ -9,42 +23,28 @@ ARG BUILD_REF
 # Labels
 LABEL \
     io.hass.name="HomeAnalytics Add-on" \
-    io.hass.description="A generic Home Assistant Add-on template with Python backend and React frontend" \
+    io.hass.description="A Home Assistant Add-on for home energy consumption and cost analytics" \
     io.hass.version=${BUILD_VERSION} \
     io.hass.type="addon" \
-    io.hass.arch="aarch64,amd64,armhf,armv7,i386" \
-    maintainer="Your Name <your.email@example.com>" \
+    io.hass.arch="aarch64,amd64" \
+    maintainer="Johan Zander <johanzander@gmail.com>" \
     org.label-schema.build-date=${BUILD_DATE} \
-    org.label-schema.description="A generic Home Assistant Add-on template with Python backend and React frontend" \
+    org.label-schema.description="A Home Assistant Add-on for home energy consumption and cost analytics" \
     org.label-schema.name="HomeAnalytics Add-on" \
     org.label-schema.schema-version="1.0" \
-    org.label-schema.vcs-ref=${BUILD_REF}
+    org.label-schema.vcs-ref=${BUILD_REF} \
+    org.label-schema.vcs-url="https://github.com/johanzander/home-analytics"
 
-# Install requirements (includes Node.js for frontend build)
+# Python and pip come from the base image (/usr/local/bin). Do NOT apk add
+# python3/py3-pip here: on the HA base-python images that installs Alpine's
+# own interpreter at /usr/bin alongside it, and which one `python3 -m venv`
+# picks then depends on PATH order. gcc/musl-dev stay for source builds.
 RUN apk add --no-cache \
-    python3 \
-    py3-pip \
-    python3-dev \
     gcc \
     musl-dev \
-    bash \
-    nodejs-current \
-    npm
+    bash
 
 # Set working directory
-WORKDIR /app
-
-# Build frontend
-WORKDIR /tmp/frontend
-COPY frontend/package*.json ./
-RUN npm ci
-
-COPY frontend/ ./
-RUN npm run build
-
-# Copy built frontend to app directory
-RUN mkdir -p /app/frontend && mv dist/* /app/frontend/
-
 WORKDIR /app
 
 # Copy Python application files from backend directory
@@ -53,6 +53,9 @@ COPY backend/sensors.yaml ./
 
 # Copy services directory
 COPY backend/services/ ./services/
+
+# Copy pre-built frontend from native build stage
+COPY --from=frontend-builder /tmp/frontend/dist/ /app/frontend/
 
 # Copy run script
 COPY backend/run.sh ./
