@@ -8,7 +8,6 @@ trying to pivot multiple sensors in a single Flux query.
 Based on patterns from reference/misc/fluxQueryServer.py
 """
 
-import io
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -62,14 +61,13 @@ class InfluxService:
         self.influx_username = username
         self.influx_password = password
         self.bucket = bucket
+        # bucket is "db/retention_policy" (InfluxDB 1.x naming carried over
+        # from the old Flux-based bucket config); InfluxQL only needs the db.
+        self.influx_db = bucket.split("/", 1)[0]
 
         self.auth = requests.auth.HTTPBasicAuth(
             self.influx_username, self.influx_password
         )
-        self.headers = {
-            "Content-type": "application/vnd.flux",
-            "Accept": "application/csv",
-        }
         self.local_tz = pytz.timezone("Europe/Stockholm")
         self.sensors = self._load_sensors(options)
 
@@ -102,38 +100,24 @@ class InfluxService:
         """
         Query a single sensor and return hourly data.
 
-        Uses window(every: 1h) + first() to get the first value in each hour,
-        which is appropriate for cumulative meter readings.
+        Uses GROUP BY time(1h) + first() to get the first value in each hour,
+        which is appropriate for cumulative meter readings. The measurement
+        name is the entity_id itself (recorder's measurement_attr: entity_id).
         """
-        # Extract the entity_id without domain prefix if present
-        # e.g., "sensor.outdoor" -> "outdoor"
-        if "." in entity_id:
-            domain, entity = entity_id.split(".", 1)
-        else:
-            domain = "sensor"
-            entity = entity_id
-
-        flux_query = f"""
-from(bucket: "{self.bucket}")
-    |> range(start: {start_utc}, stop: {stop_utc})
-    |> filter(fn: (r) => r["entity_id"] == "{entity}")
-    |> filter(fn: (r) => r["_field"] == "value")
-    |> filter(fn: (r) => r["domain"] == "{domain}")
-    |> window(every: 1h)
-    |> first()
-    |> duplicate(column: "_start", as: "_time")
-    |> window(every: inf)
-    |> drop(columns: ["result", "table", "_start", "_stop", "_field", "domain", "_measurement", "entity_id"])
-"""
+        influxql = (
+            'SELECT first("value") AS "value" '
+            f'FROM "{entity_id}" '
+            f"WHERE time >= '{start_utc}' AND time < '{stop_utc}' "
+            "GROUP BY time(1h) FILL(none)"
+        )
 
         logger.debug(f"Querying sensor: {entity_id}")
 
         try:
-            response = requests.post(
+            response = requests.get(
                 url=self.influx_url,
                 auth=self.auth,
-                headers=self.headers,
-                data=flux_query,
+                params={"db": self.influx_db, "q": influxql, "epoch": "ms"},
                 timeout=60,
             )
 
@@ -142,16 +126,10 @@ from(bucket: "{self.bucket}")
                 logger.error(f"Response: {response.text[:500]}")
                 return pd.DataFrame()
 
-            df = self._parse_csv_response(response.content.decode("utf-8"))
+            df = self._parse_influxql_response(response.json(), entity_id)
 
             if df.empty:
                 logger.warning(f"No data returned for sensor: {entity_id}")
-                return pd.DataFrame()
-
-            # Rename _value column to entity_id
-            if "_value" in df.columns:
-                df = df.rename(columns={"_value": entity_id})
-                df[entity_id] = pd.to_numeric(df[entity_id], errors="coerce")
 
             return df
 
@@ -159,71 +137,26 @@ from(bucket: "{self.bucket}")
             logger.error(f"Error querying sensor {entity_id}: {e}")
             return pd.DataFrame()
 
-    def _parse_csv_response(self, csv_data: str) -> pd.DataFrame:
-        """
-        Parse InfluxDB annotated CSV response.
-
-        The response format has:
-        - Row 0: #datatype header
-        - Row 1: #group header
-        - Row 2: #default header
-        - Row 3: Column names
-        - Row 4+: Data
-        """
-        if not csv_data.strip():
-            return pd.DataFrame()
-
-        lines = csv_data.strip().split("\n")
-
-        # Need at least 5 lines (4 headers + 1 data)
-        if len(lines) < 5:
-            logger.warning("CSV response too short")
-            return pd.DataFrame()
-
+    def _parse_influxql_response(self, data: dict, entity_id: str) -> pd.DataFrame:
+        """Parse an InfluxQL JSON response into a DataFrame indexed by local Timestamp."""
         try:
-            csv_io = io.StringIO(csv_data)
-            df = pd.read_csv(csv_io, header=None)
+            results = data.get("results", [])
+            if not results or "series" not in results[0]:
+                return pd.DataFrame()
 
-            # Row 3 (index 3) contains column names
-            column_names = df.iloc[3].values
+            series = results[0]["series"][0]
+            df = pd.DataFrame(series["values"], columns=series["columns"])
 
-            # Drop header rows (0-3)
-            df = df.drop([0, 1, 2, 3]).reset_index(drop=True)
-            df.columns = column_names
-
-            # Drop columns with NaN/empty names (first column in annotated CSV is often empty)
-            df = df.loc[:, df.columns.notna()]
-            df = df.loc[:, df.columns != ""]
-
-            # Drop any remaining metadata columns
-            cols_to_drop = [
-                "result",
-                "table",
-                "_start",
-                "_stop",
-                "_field",
-                "domain",
-                "_measurement",
-                "entity_id",
-            ]
-            df = df.drop(
-                columns=[c for c in cols_to_drop if c in df.columns], errors="ignore"
-            )
-
-            # Parse _time column
-            if "_time" in df.columns:
-                df["_time"] = pd.to_datetime(df["_time"], utc=True)
-                df["_time"] = df["_time"].dt.tz_convert(self.local_tz)
-                df["_time"] = df["_time"].dt.tz_localize(
-                    None
-                )  # Remove tz info for easier handling
-                df = df.rename(columns={"_time": "Timestamp"})
-                df = df.set_index("Timestamp")
+            df["time"] = pd.to_datetime(df["time"], unit="ms", utc=True)
+            df["time"] = df["time"].dt.tz_convert(self.local_tz).dt.tz_localize(None)
+            df = df.rename(columns={"time": "Timestamp", "value": entity_id})
+            df = df.set_index("Timestamp")
+            df[entity_id] = pd.to_numeric(df[entity_id], errors="coerce")
 
             return df
 
         except Exception as e:
-            logger.error(f"Error parsing CSV: {e}")
+            logger.error(f"Error parsing InfluxQL response for {entity_id}: {e}")
             return pd.DataFrame()
 
     def query_energy_data(
@@ -372,7 +305,7 @@ from(bucket: "{self.bucket}")
 if __name__ == "__main__":
     # Example usage
     example_options = {
-        "influxdb_url": "http://localhost:8086/api/v2/query",
+        "influxdb_url": "http://localhost:8086/query",
         "influxdb_username": "user",
         "influxdb_password": "pass",
         "influxdb_bucket": "home_assistant/autogen",
